@@ -14,7 +14,8 @@ pub enum Stmt {
     Assign(String, Box<Expr>),
     If(Box<Expr>, Block, Block),
     While(Box<Expr>, Block),
+    Print(Box<Expr>),
 }
 
-pub struct Block(Vec<Stmt>);
+pub struct Block(pub Vec<Stmt>);
 
