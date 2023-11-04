@@ -1,11 +1,12 @@
 
+use std::collections::HashMap;
 use lalrpop_util::lalrpop_mod;
 
 lalrpop_mod!(parser);
 
 mod syntax;
 
-use syntax::{Expr, BinOp, Stmt, Block};
+use syntax::{Expr, BinOp, Stmt, Block, Program};
 
 #[derive(Debug, Clone, Copy)]
 enum Insn {
@@ -20,58 +21,86 @@ enum Insn {
     SetLocal(usize), // update local variable in current frame
 }
 
-// Hmm. Instead of free functions, make compile_* methods on a 'struct Compiler'?
-// Yes. The compiler will include 'code' as a field so I don't have to pass it around, and probably
-// also things like a symbol table for compiling assignments.
-fn compile_exp(e: &Expr, code: &mut Vec<Insn>) {
-    match e {
-        Expr::Var(x) => todo!("compile var exp"),
-        Expr::Num(i) => code.push(Insn::Literal(*i)),
-        Expr::BinOp(b, e1, e2) => {
-            compile_exp(e1, code);
-            compile_exp(e2, code);
-            match b {
-                BinOp::Add => code.push(Insn::Add),
-                BinOp::Mul => code.push(Insn::Mul),
-            }
-        },
-    }
+type Location = ();
+
+struct Compiler {
+    code: Vec<Insn>,
+    scope: HashMap<String, Location>,
 }
 
-fn compile_block(b: &Block, code: &mut Vec<Insn>) {
-    // compute slots for local variables, emit 'Enter' and 'Exit' instructions?
-    for s in &b.0 {
-        compile_stmt(s, code);
+impl Compiler {
+    pub fn new() -> Self {
+        Compiler { code: Vec::new(), scope: HashMap::new() }
     }
+
+    fn emit(&mut self, i: Insn) {
+        self.code.push(i)
+    }
+
+    fn output(self) -> Vec<Insn> {
+        self.code
+    }
+
+    fn compile_exp(&mut self, e: &Expr) {
+        match e {
+            Expr::Var(x) => todo!("compile var exp"),
+            Expr::Num(i) => self.emit(Insn::Literal(*i)),
+            Expr::BinOp(b, e1, e2) => {
+                self.compile_exp(e1);
+                self.compile_exp(e2);
+                match b {
+                    BinOp::Add => self.emit(Insn::Add),
+                    BinOp::Mul => self.emit(Insn::Mul),
+                }
+            },
+        }
+    }
+
+    fn compile_stmt(&mut self, s: &Stmt) {
+        match s {
+            // TODO: Figure out how to assign slots in the local frame.  I think I will need to
+            // thread through some extra state, that maps variable names to stack slots (This is
+            // also necessary to compile variable expressions) Generating a new slot for every
+            // assigned variable is technically *correct*... but certainly not optimally efficient.
+            // Trying to minimize the number of slots used basically boils down to register
+            // allocation, but without needing to worry about register spills.  (minimum number of
+            // local slots required == max number of variables simulatenously live?  Sounds
+            // reasonable. Compute liveness with reaching definition dataflow? Maybe.)
+            Stmt::Assign(x, e) => todo!("compile assign stmt"),
+            Stmt::Print(e) => {
+                self.compile_exp(e);
+                self.emit(Insn::Print)
+            },
+            Stmt::If(e, bt, bf) => todo!("compile if stmt"),
+            Stmt::While(e, b) => todo!("compile if stmt"),
+        }
+    }
+
+    fn compile_block(&mut self, b : &Block) {
+        for s in &b.0 {
+            self.compile_stmt(s);
+        }
+    }
+
+    fn compile_program(&mut self, p: &Program) {
+        // TODO: Assign slots to all variables
+        self.compile_block(&p.0);
+        self.emit(Insn::Halt);
+    }
+
 }
 
-fn compile_stmt(s: &Stmt, code: &mut Vec<Insn>) {
-    match s {
-        // TODO: Figure out how to assign slots in the local frame.
-        // I think I will need to thread through some extra state, that maps variable names to
-        // stack slots (This is also necessary to compile variable expressions)
-        // Generating a new slot for every assigned variable is technically *correct*... but
-        // certainly not optimally efficient. Trying to minimize the number of slots used basically
-        // boils down to register allocation, but without needing to worry about register spills.
-        // (minimum number of local slots required == max number of variables simulatenously live?
-        // Sounds reasonable. Compute liveness with reaching definition dataflow? Maybe.)
-        Stmt::Assign(x, e) => todo!("compile assign stmt"),
-        Stmt::Print(e) => {
-            compile_exp(e, code);
-            code.push(Insn::Print)
-        },
-        Stmt::If(e, bt, bf) => todo!("compile if stmt"),
-        Stmt::While(e, b) => todo!("compile if stmt"),
-    }
-}
-
-// Hmm. Need a `compile_program` function, that inserts a final "Halt" instruction so that the pc
-// doesn't run off the end of the code segment.
 
 struct VM {
     stack: Vec<i64>,
     pc: usize,
     code: Vec<Insn>,
+    // TODO: this 'locals' stack isn't quite right.
+    // Actual CPUs keep a single 'frame pointer'/'base pointer' in a register, and local references
+    // are made as
+    // offsets to the FP/BP
+    // 'Enter n' pushes current FP, sets FP = FP+1 then expands stack by n slots
+    // 'Exit' sets FP to previous FP, discards slots from current frame
     locals: Vec<i64>,
 }
 
@@ -102,14 +131,14 @@ impl VM {
                 println!("{}", x);
             },
             Insn::Enter(n) => {
-                for i in 0..n {
+                for _i in 0..n {
                     self.locals.push(0 as i64);
                 }
                 self.locals.push(n as i64);
             },
             Insn::Exit => {
                 let n = self.locals.pop().unwrap();
-                for i in 0..n {
+                for _i in 0..n {
                     self.locals.pop();
                 }
             },
@@ -147,14 +176,15 @@ fn main() {
     println!("Hello, world!");
 
     let p = parser::ExprParser::new();
-    // let src = "(3 + x) * 5";
     let src = "(3 + 4) * 5";
     let e = p.parse(src).expect("valid syntax");
+    let b = Block(vec![Stmt::Print(Box::new(e))]);
+    let p = Program(b);
 
-    let mut code = Vec::new();
-    compile_exp(&e, &mut code);
-    code.push(Insn::Print);
-    code.push(Insn::Halt);
+    let mut com = Compiler::new();
+    com.compile_program(&p);
+
+    let code = com.output();
     println!("{:?}", code);
 
     let mut vm = VM::new(code);

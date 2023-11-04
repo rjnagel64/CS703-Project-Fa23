@@ -19,3 +19,5 @@ pub enum Stmt {
 
 pub struct Block(pub Vec<Stmt>);
 
+pub struct Program(pub Block);
+
