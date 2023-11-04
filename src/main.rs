@@ -15,11 +15,14 @@ enum Insn {
     Mul,
     Print,
     Enter(usize), // create a stack frame with n locals
-    Exit, // pop that stack frame
+    Exit, // pop the current stack frame
     GetLocal(usize), // retrieve local variable from current frame
     SetLocal(usize), // update local variable in current frame
 }
 
+// Hmm. Instead of free functions, make compile_* methods on a 'struct Compiler'?
+// Yes. The compiler will include 'code' as a field so I don't have to pass it around, and probably
+// also things like a symbol table for compiling assignments.
 fn compile_exp(e: &Expr, code: &mut Vec<Insn>) {
     match e {
         Expr::Var(x) => todo!("compile var exp"),
@@ -36,6 +39,7 @@ fn compile_exp(e: &Expr, code: &mut Vec<Insn>) {
 }
 
 fn compile_block(b: &Block, code: &mut Vec<Insn>) {
+    // compute slots for local variables, emit 'Enter' and 'Exit' instructions?
     for s in &b.0 {
         compile_stmt(s, code);
     }
@@ -46,9 +50,9 @@ fn compile_stmt(s: &Stmt, code: &mut Vec<Insn>) {
         // TODO: Figure out how to assign slots in the local frame.
         // I think I will need to thread through some extra state, that maps variable names to
         // stack slots (This is also necessary to compile variable expressions)
-        // Generating a new slot for every assignment is technically *correct*... but certainly not
-        // optimally efficient. Trying to minimize the number of slots used basically boils down to
-        // register allocation, but without needing to worry about register spills.
+        // Generating a new slot for every assigned variable is technically *correct*... but
+        // certainly not optimally efficient. Trying to minimize the number of slots used basically
+        // boils down to register allocation, but without needing to worry about register spills.
         // (minimum number of local slots required == max number of variables simulatenously live?
         // Sounds reasonable. Compute liveness with reaching definition dataflow? Maybe.)
         Stmt::Assign(x, e) => todo!("compile assign stmt"),
