@@ -12,11 +12,15 @@ match {
   // Numbers and identifiers
   r"[0-9]+" => NUM,
   r"[a-zA-Z_][a-zA-Z0-9_']*" => IDENT,
-  "let",
   "print",
-  "sqrt",
-  "@",
+  "if",
+  "then",
+  "else",
+  "while",
+  "do",
+  "end",
   "=",
+  ";",
   "(",
   ")",
   "+",
@@ -28,7 +32,7 @@ Literal: i64 = NUM => <>.parse::<i64>().unwrap(); // valid b/c NUM is valid inte
 
 Var: String = IDENT => <>.to_string();
 
-pub Expr: Expr = AddExpr;
+Expr: Expr = AddExpr;
 
 AtomExpr: Expr = {
     Var => Expr::Var(<>),
@@ -45,5 +49,26 @@ AddExpr: Expr = {
     <lhs: AddExpr> "+" <rhs: MulExpr> => Expr::BinOp(BinOp::Add, Box::new(lhs), Box::new(rhs)),
     MulExpr => <>,
 };
+
+Stmt: Stmt = {
+    <x: Var> "=" <e: Expr> ";" => Stmt::Assign(x, Box::new(e)),
+    "print" <e: Expr> ";" => Stmt::Print(Box::new(e)),
+    "if" <e: Expr> "then" <bt: Block> "else" <bf: Block> "end" => Stmt::If(Box::new(e), bt, bf),
+    "while" <e: Expr> "do" <b: Block> "end" => Stmt::While(Box::new(e), b),
+}
+
+Block: Block = {
+    Stmts => Block(<>),
+}
+
+Stmts: Vec<Stmt> = {
+    Stmt => vec![<>],
+    <mut ss: Stmts> <s: Stmt> => { ss.push(s); ss }
+}
+
+pub Program: Program = {
+    Block => Program(<>),
+}
+
 
 // vim: set et sts=4 sw=4:

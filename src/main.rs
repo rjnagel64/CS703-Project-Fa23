@@ -175,11 +175,9 @@ impl VM {
 fn main() {
     println!("Hello, world!");
 
-    let p = parser::ExprParser::new();
-    let src = "(3 + 4) * 5";
-    let e = p.parse(src).expect("valid syntax");
-    let b = Block(vec![Stmt::Print(Box::new(e))]);
-    let p = Program(b);
+    let par = parser::ProgramParser::new();
+    let src = "print (3 + 4) * 5;";
+    let p = par.parse(src).expect("valid syntax");
 
     let mut com = Compiler::new();
     com.compile_program(&p);
