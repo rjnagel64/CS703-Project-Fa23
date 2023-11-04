@@ -1,0 +1,49 @@
+
+use crate::syntax::*;
+
+grammar;
+
+// Lexer/Token definitions for this grammar
+match {
+  // Ignore whitespace and line comments
+  r"#[^\n\r]*[\n\r]*" => { },
+  r"\s*" => { },
+} else {
+  // Numbers and identifiers
+  r"[0-9]+" => NUM,
+  r"[a-zA-Z_][a-zA-Z0-9_']*" => IDENT,
+  "let",
+  "print",
+  "sqrt",
+  "@",
+  "=",
+  "(",
+  ")",
+  "+",
+  "-",
+  "*",
+}
+
+Literal: i64 = NUM => <>.parse::<i64>().unwrap(); // valid b/c NUM is valid integer literal.
+
+Var: String = IDENT => <>.to_string();
+
+pub Expr: Expr = AddExpr;
+
+AtomExpr: Expr = {
+    Var => Expr::Var(<>),
+    Literal => Expr::Num(<>),
+    "(" <Expr> ")" => <>,
+};
+
+MulExpr: Expr = {
+    <lhs: MulExpr> "*" <rhs: AtomExpr> => Expr::BinOp(BinOp::Mul, Box::new(lhs), Box::new(rhs)),
+    AtomExpr => <>,
+};
+
+AddExpr: Expr = {
+    <lhs: AddExpr> "+" <rhs: MulExpr> => Expr::BinOp(BinOp::Add, Box::new(lhs), Box::new(rhs)),
+    MulExpr => <>,
+};
+
+// vim: set et sts=4 sw=4:
