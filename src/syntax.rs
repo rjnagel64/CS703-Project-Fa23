@@ -7,7 +7,10 @@ pub enum Expr {
 
 pub enum BinOp {
     Add,
+    Sub,
     Mul,
+    Lt,
+    Gt,
 }
 
 pub enum Stmt {

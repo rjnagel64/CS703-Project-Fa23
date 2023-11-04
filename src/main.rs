@@ -13,12 +13,17 @@ enum Insn {
     Halt,
     Literal(i64),
     Add,
+    Sub,
     Mul,
+    Lt,
+    Gt,
     Print,
     Enter(usize), // create a stack frame with n locals
     Exit, // pop the current stack frame
     GetLocal(usize), // retrieve local variable from current frame
     SetLocal(usize), // update local variable in current frame
+    Branch(isize),
+    BranchZero(isize),
 }
 
 struct Compiler {
@@ -34,6 +39,14 @@ impl Compiler {
 
     fn emit(&mut self, i: Insn) {
         self.code.push(i)
+    }
+
+    fn here(&self) -> usize {
+        self.code.len()
+    }
+
+    fn branch_offset(&self, from: usize, to: usize) -> isize {
+        (to as isize) - (from as isize)
     }
 
     fn output(self) -> Vec<Insn> {
@@ -52,7 +65,10 @@ impl Compiler {
                 self.compile_exp(e2);
                 match b {
                     BinOp::Add => self.emit(Insn::Add),
+                    BinOp::Sub => self.emit(Insn::Sub),
                     BinOp::Mul => self.emit(Insn::Mul),
+                    BinOp::Lt => self.emit(Insn::Lt),
+                    BinOp::Gt => self.emit(Insn::Gt),
                 }
             },
         }
@@ -69,8 +85,41 @@ impl Compiler {
                 self.compile_exp(e);
                 self.emit(Insn::Print)
             },
-            Stmt::If(e, bt, bf) => todo!("compile if stmt"),
-            Stmt::While(e, b) => todo!("compile if stmt"),
+            Stmt::If(e, bt, bf) => {
+                self.compile_exp(e);
+                let branch = self.here();
+                self.emit(Insn::BranchZero(0));
+
+                self.compile_block(bt);
+                let bt_end = self.here();
+                self.emit(Insn::Branch(0));
+
+                let bf_start = self.here();
+                self.compile_block(bf);
+                let bf_end = self.here();
+
+                // Patch branches now that we know distance between the labels.
+                self.code[branch] = Insn::BranchZero(self.branch_offset(branch, bf_start));
+                self.code[bt_end] = Insn::Branch(self.branch_offset(bt_end, bf_end));
+            }
+            Stmt::While(e, b) => {
+                let loop_start = self.here();
+                self.compile_exp(e);
+                let branch = self.here();
+                self.emit(Insn::BranchZero(0));
+
+                self.compile_block(b);
+                let repeat = self.here();
+                self.emit(Insn::Branch(0));
+                let loop_end = self.here();
+
+                // aargh. can't patch loop_end because code[loop_end] is out of bounds (there's no
+                // actual instruction at loop_end)
+
+                self.code[branch] = Insn::BranchZero(self.branch_offset(branch, loop_end));
+                // will be negative.
+                self.code[repeat] = Insn::Branch(self.branch_offset(repeat, loop_start));
+            }
         }
     }
 
@@ -106,7 +155,7 @@ impl Compiler {
 
     fn assign_slots_stmt(&mut self, s: &Stmt) {
         match s {
-            Stmt::Assign(x, e) => {
+            Stmt::Assign(x, _e) => {
                 let entry = self.slots.entry(x.clone());
                 // If this variable already has a slot, nothing needs to be done.
                 // Otherwise, we need to assign a new slot.
@@ -159,10 +208,25 @@ impl VM {
                 let x = self.stack.pop().unwrap();
                 self.stack.push(x + y);
             },
+            Insn::Sub => {
+                let y = self.stack.pop().unwrap();
+                let x = self.stack.pop().unwrap();
+                self.stack.push(x - y);
+            },
             Insn::Mul => {
                 let y = self.stack.pop().unwrap();
                 let x = self.stack.pop().unwrap();
                 self.stack.push(x * y);
+            },
+            Insn::Lt => {
+                let y = self.stack.pop().unwrap();
+                let x = self.stack.pop().unwrap();
+                self.stack.push(if x < y { 1 } else { 0 });
+            },
+            Insn::Gt => {
+                let y = self.stack.pop().unwrap();
+                let x = self.stack.pop().unwrap();
+                self.stack.push(if x > y { 1 } else { 0 });
             },
             Insn::Print => {
                 let x = self.stack.pop().unwrap();
@@ -193,6 +257,14 @@ impl VM {
                 let val = self.stack.pop().unwrap();
                 self.locals[index] = val;
             },
+            Insn::Branch(n) => return Some(self.pc.wrapping_add_signed(n)),
+            Insn::BranchZero(n) => {
+                let x = self.stack.pop().unwrap();
+                if x == 0 {
+                    return Some(self.pc.wrapping_add_signed(n));
+                }
+            },
+
         }
         Some(self.pc + 1)
     }
@@ -215,7 +287,9 @@ fn main() {
 
     let par = parser::ProgramParser::new();
     // let src = "print (3 + 4) * 5;";
-    let src = "x = 3; y = x * 2; x = x + 1; y = x + y; print y;";
+    // let src = "x = 3; y = x * 2; x = x + 1; y = x + y; print y;";
+    let src = "x = 10; y = 1; while x > 0 do y = y * x; x = x - 1; end print y;";
+    // let src = "x = 5; y = 3; if x > y then print 2; else print 4; end";
     let p = par.parse(src).expect("valid syntax");
 
     let mut com = Compiler::new();

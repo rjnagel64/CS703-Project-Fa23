@@ -26,13 +26,15 @@ match {
   "+",
   "-",
   "*",
+  "<",
+  ">",
 }
 
 Literal: i64 = NUM => <>.parse::<i64>().unwrap(); // valid b/c NUM is valid integer literal.
 
 Var: String = IDENT => <>.to_string();
 
-Expr: Expr = AddExpr;
+Expr: Expr = CmpExpr;
 
 AtomExpr: Expr = {
     Var => Expr::Var(<>),
@@ -47,8 +49,15 @@ MulExpr: Expr = {
 
 AddExpr: Expr = {
     <lhs: AddExpr> "+" <rhs: MulExpr> => Expr::BinOp(BinOp::Add, Box::new(lhs), Box::new(rhs)),
+    <lhs: AddExpr> "-" <rhs: MulExpr> => Expr::BinOp(BinOp::Sub, Box::new(lhs), Box::new(rhs)),
     MulExpr => <>,
 };
+
+CmpExpr: Expr = {
+    <lhs: AddExpr> "<" <rhs: AddExpr> => Expr::BinOp(BinOp::Lt, Box::new(lhs), Box::new(rhs)),
+    <lhs: AddExpr> ">" <rhs: AddExpr> => Expr::BinOp(BinOp::Gt, Box::new(lhs), Box::new(rhs)),
+    AddExpr => <>,
+}
 
 Stmt: Stmt = {
     <x: Var> "=" <e: Expr> ";" => Stmt::Assign(x, Box::new(e)),
