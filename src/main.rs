@@ -21,16 +21,15 @@ enum Insn {
     SetLocal(usize), // update local variable in current frame
 }
 
-type Location = ();
-
 struct Compiler {
     code: Vec<Insn>,
-    scope: HashMap<String, Location>,
+    slots: HashMap<String, usize>,
+    num_slots: usize,
 }
 
 impl Compiler {
     pub fn new() -> Self {
-        Compiler { code: Vec::new(), scope: HashMap::new() }
+        Compiler { code: Vec::new(), slots: HashMap::new(), num_slots: 0 }
     }
 
     fn emit(&mut self, i: Insn) {
@@ -43,7 +42,10 @@ impl Compiler {
 
     fn compile_exp(&mut self, e: &Expr) {
         match e {
-            Expr::Var(x) => todo!("compile var exp"),
+            Expr::Var(x) => {
+                let slot = self.slots.get(x).unwrap();
+                self.emit(Insn::GetLocal(*slot));
+            }
             Expr::Num(i) => self.emit(Insn::Literal(*i)),
             Expr::BinOp(b, e1, e2) => {
                 self.compile_exp(e1);
@@ -58,15 +60,11 @@ impl Compiler {
 
     fn compile_stmt(&mut self, s: &Stmt) {
         match s {
-            // TODO: Figure out how to assign slots in the local frame.  I think I will need to
-            // thread through some extra state, that maps variable names to stack slots (This is
-            // also necessary to compile variable expressions) Generating a new slot for every
-            // assigned variable is technically *correct*... but certainly not optimally efficient.
-            // Trying to minimize the number of slots used basically boils down to register
-            // allocation, but without needing to worry about register spills.  (minimum number of
-            // local slots required == max number of variables simulatenously live?  Sounds
-            // reasonable. Compute liveness with reaching definition dataflow? Maybe.)
-            Stmt::Assign(x, e) => todo!("compile assign stmt"),
+            Stmt::Assign(x, e) => {
+                self.compile_exp(e);
+                let slot = self.slots.get(x).unwrap();
+                self.emit(Insn::SetLocal(*slot));
+            }
             Stmt::Print(e) => {
                 self.compile_exp(e);
                 self.emit(Insn::Print)
@@ -83,11 +81,51 @@ impl Compiler {
     }
 
     fn compile_program(&mut self, p: &Program) {
-        // TODO: Assign slots to all variables
+        self.assign_slots(p);
+
+        self.emit(Insn::Enter(self.num_slots));
         self.compile_block(&p.0);
+        self.emit(Insn::Exit);
         self.emit(Insn::Halt);
     }
 
+    // Traverse the program to assign local slots to each distinct variable.
+    // The implementation currently assigns each distinct variable its own slot, which is correct,
+    // but not optimal. A smarter implementation would use live variable ranges to re-use slots
+    // once their contents are no longer live, similar to register allocation (but without the need
+    // to worry about register spilling.)
+    fn assign_slots(&mut self, p: &Program) {
+        self.assign_slots_block(&p.0);
+    }
+
+    fn assign_slots_block(&mut self, b: &Block) {
+        for s in &b.0 {
+            self.assign_slots_stmt(s);
+        }
+    }
+
+    fn assign_slots_stmt(&mut self, s: &Stmt) {
+        match s {
+            Stmt::Assign(x, e) => {
+                let entry = self.slots.entry(x.clone());
+                // If this variable already has a slot, nothing needs to be done.
+                // Otherwise, we need to assign a new slot.
+                entry.or_insert_with(|| {
+                    let i = self.num_slots;
+                    self.num_slots += 1;
+                    i
+                });
+            },
+            Stmt::Print(_e) => {},
+            Stmt::If(_e, bt, bf) => {
+                self.assign_slots_block(bt);
+                self.assign_slots_block(bf);
+            }
+            Stmt::While(_e, b) => {
+                self.assign_slots_block(b);
+            }
+        }
+    }
 }
 
 
@@ -176,7 +214,8 @@ fn main() {
     println!("Hello, world!");
 
     let par = parser::ProgramParser::new();
-    let src = "print (3 + 4) * 5;";
+    // let src = "print (3 + 4) * 5;";
+    let src = "x = 3; y = x * 2; x = x + 1; y = x + y; print y;";
     let p = par.parse(src).expect("valid syntax");
 
     let mut com = Compiler::new();
