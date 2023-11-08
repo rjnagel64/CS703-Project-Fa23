@@ -32,7 +32,7 @@ match {
 
 Literal: i64 = NUM => <>.parse::<i64>().unwrap(); // valid b/c NUM is valid integer literal.
 
-Var: String = IDENT => <>.to_string();
+Var: Var = IDENT => Var(<>.to_string());
 
 Expr: Expr = CmpExpr;
 

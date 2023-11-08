@@ -7,7 +7,7 @@ lalrpop_mod!(parser);
 mod syntax;
 
 use parser::ProgramParser;
-use syntax::{Expr, BinOp, Stmt, Block, Program};
+use syntax::{Var, Expr, BinOp, Stmt, Block, Program};
 
 #[derive(Debug, Clone, Copy)]
 enum Insn {
@@ -29,7 +29,7 @@ enum Insn {
 
 struct Compiler {
     code: Vec<Insn>,
-    slots: HashMap<String, usize>,
+    slots: HashMap<Var, usize>,
     num_slots: usize,
 }
 

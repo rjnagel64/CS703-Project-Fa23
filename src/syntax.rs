@@ -1,6 +1,9 @@
 
+#[derive(Clone, PartialEq, Eq, Hash)]
+pub struct Var(pub String);
+
 pub enum Expr {
-    Var(String),
+    Var(Var),
     Num(i64),
     BinOp(BinOp, Box<Expr>, Box<Expr>),
 }
@@ -14,7 +17,7 @@ pub enum BinOp {
 }
 
 pub enum Stmt {
-    Assign(String, Box<Expr>),
+    Assign(Var, Box<Expr>),
     If(Box<Expr>, Block, Block),
     While(Box<Expr>, Block),
     Print(Box<Expr>),
