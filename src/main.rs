@@ -6,6 +6,7 @@ lalrpop_mod!(parser);
 
 mod syntax;
 
+use parser::ProgramParser;
 use syntax::{Expr, BinOp, Stmt, Block, Program};
 
 #[derive(Debug, Clone, Copy)]
@@ -113,11 +114,7 @@ impl Compiler {
                 self.emit(Insn::Branch(0));
                 let loop_end = self.here();
 
-                // aargh. can't patch loop_end because code[loop_end] is out of bounds (there's no
-                // actual instruction at loop_end)
-
                 self.code[branch] = Insn::BranchZero(self.branch_offset(branch, loop_end));
-                // will be negative.
                 self.code[repeat] = Insn::Branch(self.branch_offset(repeat, loop_start));
             }
         }
@@ -285,12 +282,12 @@ impl VM {
 fn main() {
     println!("Hello, world!");
 
-    let par = parser::ProgramParser::new();
     // let src = "print (3 + 4) * 5;";
     // let src = "x = 3; y = x * 2; x = x + 1; y = x + y; print y;";
     let src = "x = 10; y = 1; while x > 0 do y = y * x; x = x - 1; end print y;";
     // let src = "x = 5; y = 3; if x > y then print 2; else print 4; end";
-    let p = par.parse(src).expect("valid syntax");
+    let parser = ProgramParser::new();
+    let p = parser.parse(src).expect("valid syntax");
 
     let mut com = Compiler::new();
     com.compile_program(&p);
