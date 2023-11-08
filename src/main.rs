@@ -19,20 +19,10 @@ enum Insn {
     Lt,
     Gt,
     Print,
-    // create a stack frame with n locals
     Enter(usize),
-    // pop the current stack frame
-    Exit,
-    // retrieve local variable from current frame
+    Exit(usize),
     GetLocal(usize),
-    // update local variable in current frame
     SetLocal(usize),
-    Enter2(usize),
-    Exit2(usize),
-    GetLocal2(usize),
-    SetLocal2(usize),
-    // GetLocal2(usize),
-    // SetLocal2(usize),
     Branch(isize),
     BranchZero(isize),
 }
@@ -68,8 +58,7 @@ impl Compiler {
         match e {
             Expr::Var(x) => {
                 let slot = self.slots.get(x).unwrap();
-                // self.emit(Insn::GetLocal(*slot));
-                self.emit(Insn::GetLocal2(*slot));
+                self.emit(Insn::GetLocal(*slot));
             }
             Expr::Num(i) => self.emit(Insn::Literal(*i)),
             Expr::BinOp(b, e1, e2) => {
@@ -91,8 +80,7 @@ impl Compiler {
             Stmt::Assign(x, e) => {
                 self.compile_exp(e);
                 let slot = self.slots.get(x).unwrap();
-                // self.emit(Insn::SetLocal(*slot));
-                self.emit(Insn::SetLocal2(*slot));
+                self.emit(Insn::SetLocal(*slot));
             }
             Stmt::Print(e) => {
                 self.compile_exp(e);
@@ -141,11 +129,9 @@ impl Compiler {
     fn compile_program(&mut self, p: &Program) {
         self.assign_slots(p);
 
-        // self.emit(Insn::Enter(self.num_slots));
-        self.emit(Insn::Enter2(self.num_slots));
+        self.emit(Insn::Enter(self.num_slots));
         self.compile_block(&p.0);
-        // self.emit(Insn::Exit);
-        self.emit(Insn::Exit2(self.num_slots));
+        self.emit(Insn::Exit(self.num_slots));
         self.emit(Insn::Halt);
     }
 
@@ -239,47 +225,22 @@ impl VM {
                 println!("{}", x);
             },
             Insn::Enter(n) => {
-                for _i in 0..n {
-                    self.locals.push(0 as i64);
-                }
-                self.locals.push(n as i64);
-            },
-            Insn::Exit => {
-                let n = self.locals.pop().unwrap();
-                for _i in 0..n {
-                    self.locals.pop();
-                }
-            },
-            Insn::GetLocal(x) => {
-                // len() - 1 contains number of locals in this block.
-                // len() - 1 - 1 contains local #1
-                // len() - 1 - i contains local #i
-                let index = self.locals.len() - 1 - x;
-                let val = self.locals[index];
-                self.stack.push(val);
-            },
-            Insn::SetLocal(x) => {
-                let index = self.locals.len() - 1 - x;
-                let val = self.stack.pop().unwrap();
-                self.locals[index] = val;
-            },
-            Insn::Enter2(n) => {
                 self.locals.push(self.fp as i64); // hmm. Annoying cast.
                 self.fp = self.locals.len();
                 for _ in 0..n {
                     self.locals.push(0);
                 }
             },
-            Insn::Exit2(n) => {
+            Insn::Exit(n) => {
                 for _ in 0..n {
                     self.locals.pop().unwrap();
                 }
                 self.fp = self.locals.pop().unwrap() as usize; // hmm. Annoying cast.
             },
-            Insn::GetLocal2(x) => {
+            Insn::GetLocal(x) => {
                 self.stack.push(self.locals[self.fp + x]);
             },
-            Insn::SetLocal2(x) => {
+            Insn::SetLocal(x) => {
                 self.locals[self.fp + x] = self.stack.pop().unwrap();
             },
             Insn::Branch(n) => return Some(self.pc.wrapping_add_signed(n)),
