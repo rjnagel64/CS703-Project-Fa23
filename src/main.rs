@@ -19,10 +19,20 @@ enum Insn {
     Lt,
     Gt,
     Print,
-    Enter(usize), // create a stack frame with n locals
-    Exit, // pop the current stack frame
-    GetLocal(usize), // retrieve local variable from current frame
-    SetLocal(usize), // update local variable in current frame
+    // create a stack frame with n locals
+    Enter(usize),
+    // pop the current stack frame
+    Exit,
+    // retrieve local variable from current frame
+    GetLocal(usize),
+    // update local variable in current frame
+    SetLocal(usize),
+    Enter2(usize),
+    Exit2(usize),
+    GetLocal2(usize),
+    SetLocal2(usize),
+    // GetLocal2(usize),
+    // SetLocal2(usize),
     Branch(isize),
     BranchZero(isize),
 }
@@ -58,7 +68,8 @@ impl Compiler {
         match e {
             Expr::Var(x) => {
                 let slot = self.slots.get(x).unwrap();
-                self.emit(Insn::GetLocal(*slot));
+                // self.emit(Insn::GetLocal(*slot));
+                self.emit(Insn::GetLocal2(*slot));
             }
             Expr::Num(i) => self.emit(Insn::Literal(*i)),
             Expr::BinOp(b, e1, e2) => {
@@ -80,7 +91,8 @@ impl Compiler {
             Stmt::Assign(x, e) => {
                 self.compile_exp(e);
                 let slot = self.slots.get(x).unwrap();
-                self.emit(Insn::SetLocal(*slot));
+                // self.emit(Insn::SetLocal(*slot));
+                self.emit(Insn::SetLocal2(*slot));
             }
             Stmt::Print(e) => {
                 self.compile_exp(e);
@@ -129,9 +141,11 @@ impl Compiler {
     fn compile_program(&mut self, p: &Program) {
         self.assign_slots(p);
 
-        self.emit(Insn::Enter(self.num_slots));
+        // self.emit(Insn::Enter(self.num_slots));
+        self.emit(Insn::Enter2(self.num_slots));
         self.compile_block(&p.0);
-        self.emit(Insn::Exit);
+        // self.emit(Insn::Exit);
+        self.emit(Insn::Exit2(self.num_slots));
         self.emit(Insn::Halt);
     }
 
@@ -177,20 +191,15 @@ impl Compiler {
 
 struct VM {
     stack: Vec<i64>,
-    pc: usize,
-    code: Vec<Insn>,
-    // TODO: this 'locals' stack isn't quite right.
-    // Actual CPUs keep a single 'frame pointer'/'base pointer' in a register, and local references
-    // are made as
-    // offsets to the FP/BP
-    // 'Enter n' pushes current FP, sets FP = FP+1 then expands stack by n slots
-    // 'Exit' sets FP to previous FP, discards slots from current frame
     locals: Vec<i64>,
+    code: Vec<Insn>,
+    pc: usize, // index of current instruction in `code`
+    fp: usize, // offset of current frame in `locals`
 }
 
 impl VM {
     pub fn new(code: Vec<Insn>) -> Self {
-        VM { stack: Vec::new(), pc: 0, code: code, locals: Vec::new() }
+        VM { stack: Vec::new(), locals: Vec::new(), code: code, pc: 0, fp: 0 }
     }
 
     fn step(&mut self) -> Option<usize> {
@@ -253,6 +262,25 @@ impl VM {
                 let index = self.locals.len() - 1 - x;
                 let val = self.stack.pop().unwrap();
                 self.locals[index] = val;
+            },
+            Insn::Enter2(n) => {
+                self.locals.push(self.fp as i64); // hmm. Annoying cast.
+                self.fp = self.locals.len();
+                for _ in 0..n {
+                    self.locals.push(0);
+                }
+            },
+            Insn::Exit2(n) => {
+                for _ in 0..n {
+                    self.locals.pop().unwrap();
+                }
+                self.fp = self.locals.pop().unwrap() as usize; // hmm. Annoying cast.
+            },
+            Insn::GetLocal2(x) => {
+                self.stack.push(self.locals[self.fp + x]);
+            },
+            Insn::SetLocal2(x) => {
+                self.locals[self.fp + x] = self.stack.pop().unwrap();
             },
             Insn::Branch(n) => return Some(self.pc.wrapping_add_signed(n)),
             Insn::BranchZero(n) => {
