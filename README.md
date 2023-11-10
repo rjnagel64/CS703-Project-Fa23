@@ -24,7 +24,8 @@ stack = []
 
 ```
 cargo run fibonacci.prog
---- omitted bytecode... ---
+--- Compiled bytecode: ---
+((omitted))
 --- Results: ---
 55
 pc = 27
