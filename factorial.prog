@@ -1,4 +1,5 @@
-x = 10;
+# Read x from the command line
+input x;
 y = 1;
 
 while x > 0 do

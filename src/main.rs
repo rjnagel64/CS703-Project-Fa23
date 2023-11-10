@@ -23,6 +23,7 @@ enum Insn {
     Exit(usize),
     GetLocal(usize),
     SetLocal(usize),
+    Input(usize),
     Branch(isize),
     BranchZero(isize),
 }
@@ -81,7 +82,11 @@ impl Compiler {
                 self.compile_exp(e);
                 let slot = self.slots.get(x).unwrap();
                 self.emit(Insn::SetLocal(*slot));
-            }
+            },
+            Stmt::Input(x) => {
+                let slot = self.slots.get(x).unwrap();
+                self.emit(Insn::Input(*slot));
+            },
             Stmt::Print(e) => {
                 self.compile_exp(e);
                 self.emit(Insn::Print)
@@ -162,6 +167,14 @@ impl Compiler {
                     i
                 });
             },
+            Stmt::Input(x) => {
+                let entry = self.slots.entry(x.clone());
+                entry.or_insert_with(|| {
+                    let i = self.num_slots;
+                    self.num_slots += 1;
+                    i
+                });
+            },
             Stmt::Print(_e) => {},
             Stmt::If(_e, bt, bf) => {
                 self.assign_slots_block(bt);
@@ -181,11 +194,12 @@ struct VM {
     code: Vec<Insn>,
     pc: usize, // index of current instruction in `code`
     fp: usize, // offset of current frame in `locals`
+    args: Vec<i64>, // command-line arguments provided as inputs to the program
 }
 
 impl VM {
-    pub fn new(code: Vec<Insn>) -> Self {
-        VM { stack: Vec::new(), locals: Vec::new(), code: code, pc: 0, fp: 0 }
+    pub fn new(code: Vec<Insn>, args: Vec<i64>) -> Self {
+        VM { stack: Vec::new(), locals: Vec::new(), code: code, pc: 0, fp: 0, args: args }
     }
 
     fn step(&mut self) -> Option<usize> {
@@ -243,6 +257,9 @@ impl VM {
             Insn::SetLocal(x) => {
                 self.locals[self.fp + x] = self.stack.pop().unwrap();
             },
+            Insn::Input(x) => {
+                self.locals[self.fp + x] = self.args.remove(0);
+            },
             Insn::Branch(n) => return Some(self.pc.wrapping_add_signed(n)),
             Insn::BranchZero(n) => {
                 let x = self.stack.pop().unwrap();
@@ -268,7 +285,7 @@ impl VM {
     }
 }
 
-fn run_program(src: &str) {
+fn run_program(src: &str, args: Vec<i64>) {
     let parser = ProgramParser::new();
     let p = parser.parse(src).expect("valid syntax");
 
@@ -276,27 +293,27 @@ fn run_program(src: &str) {
     com.compile_program(&p);
 
     let code = com.output();
+    println!("--- Compiled bytecode: ---");
     println!("{:?}", code);
 
-    let mut vm = VM::new(code);
+    let mut vm = VM::new(code, args);
 
+    println!("--- Results: ---");
     vm.execute();
     vm.dump_state();
 }
 
 fn main() {
-    println!("Hello, world!");
-
     // let src = "print (3 + 4) * 5;";
     // let src = "x = 3; y = x * 2; x = x + 1; y = x + y; print y;";
-    // let src = "x = 10; y = 1; while x > 0 do y = y * x; x = x - 1; end print y;";
     // let src = "x = 5; y = 3; if x > y then print 2; else print 4; end";
-    // let src = "a = 0; b = 1; n = 10; while n > 0 do c = a + b; a = b; b = c; n = n - 1; end print a;";
 
     let mut args = std::env::args();
     args.next().unwrap(); // skip argv[0]
     let src_filename = args.next().expect("a filename on the command line");
     let src = std::fs::read_to_string(src_filename).expect("file should exist");
 
-    run_program(&src);
+    let arg_vals = args.map(|n| n.parse::<i64>().unwrap()).collect();
+
+    run_program(&src, arg_vals);
 }

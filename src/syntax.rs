@@ -21,6 +21,7 @@ pub enum Stmt {
     If(Box<Expr>, Block, Block),
     While(Box<Expr>, Block),
     Print(Box<Expr>),
+    Input(Var),
 }
 
 pub struct Block(pub Vec<Stmt>);

@@ -13,6 +13,7 @@ match {
   r"[0-9]+" => NUM,
   r"[a-zA-Z_][a-zA-Z0-9_']*" => IDENT,
   "print",
+  "input",
   "if",
   "then",
   "else",
@@ -61,8 +62,8 @@ CmpExpr: Expr = {
 
 Stmt: Stmt = {
     <x: Var> "=" <e: Expr> ";" => Stmt::Assign(x, Box::new(e)),
-    // TODO: An "input x;" statement so that my programs can't just be precomputed.
     "print" <e: Expr> ";" => Stmt::Print(Box::new(e)),
+    "input" <x: Var> ";" => Stmt::Input(x),
     "if" <e: Expr> "then" <bt: Block> "else" <bf: Block> "end" => Stmt::If(Box::new(e), bt, bf),
     "while" <e: Expr> "do" <b: Block> "end" => Stmt::While(Box::new(e), b),
 }
