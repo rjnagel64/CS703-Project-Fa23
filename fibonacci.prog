@@ -1,0 +1,12 @@
+a = 0;
+b = 1;
+
+n = 10;
+while n > 0 do
+  c = a + b;
+  a = b;
+  b = c;
+  n = n - 1;
+end
+
+print a;

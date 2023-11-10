@@ -268,13 +268,7 @@ impl VM {
     }
 }
 
-fn main() {
-    println!("Hello, world!");
-
-    // let src = "print (3 + 4) * 5;";
-    // let src = "x = 3; y = x * 2; x = x + 1; y = x + y; print y;";
-    let src = "x = 10; y = 1; while x > 0 do y = y * x; x = x - 1; end print y;";
-    // let src = "x = 5; y = 3; if x > y then print 2; else print 4; end";
+fn run_program(src: &str) {
     let parser = ProgramParser::new();
     let p = parser.parse(src).expect("valid syntax");
 
@@ -288,4 +282,21 @@ fn main() {
 
     vm.execute();
     vm.dump_state();
+}
+
+fn main() {
+    println!("Hello, world!");
+
+    // let src = "print (3 + 4) * 5;";
+    // let src = "x = 3; y = x * 2; x = x + 1; y = x + y; print y;";
+    // let src = "x = 10; y = 1; while x > 0 do y = y * x; x = x - 1; end print y;";
+    // let src = "x = 5; y = 3; if x > y then print 2; else print 4; end";
+    // let src = "a = 0; b = 1; n = 10; while n > 0 do c = a + b; a = b; b = c; n = n - 1; end print a;";
+
+    let mut args = std::env::args();
+    args.next().unwrap(); // skip argv[0]
+    let src_filename = args.next().expect("a filename on the command line");
+    let src = std::fs::read_to_string(src_filename).expect("file should exist");
+
+    run_program(&src);
 }
