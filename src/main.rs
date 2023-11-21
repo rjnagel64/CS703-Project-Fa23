@@ -5,6 +5,7 @@ use lalrpop_util::lalrpop_mod;
 lalrpop_mod!(parser);
 
 mod syntax;
+mod egraph;
 
 use parser::ProgramParser;
 use syntax::{Var, Expr, BinOp, Stmt, Block, Program};
@@ -311,6 +312,10 @@ fn main() {
     let mut args = std::env::args();
     args.next().unwrap(); // skip argv[0]
     let src_filename = args.next().expect("a filename on the command line");
+    if src_filename == "TEST" {
+        egraph::demo();
+        return;
+    }
     let src = std::fs::read_to_string(src_filename).expect("file should exist");
 
     let arg_vals = args.map(|n| n.parse::<i64>().unwrap()).collect();

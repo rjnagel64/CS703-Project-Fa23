@@ -1,0 +1,43 @@
+
+# Determine whether 3 points are arranged clockwise, counterclockwise, or are collinear.
+# example: (3, 4) -> (3, 6) -> (1, 4) is counterclockwise
+# example: (2, 2) -> (4, 3) -> (0, 2) is clockwise
+# example: (1, 1) -> (2, 3) -> (0, -1) are collinear
+input ax;
+input ay;
+input bx;
+input by;
+input cx;
+input cy;
+
+# construct displacement vectors u and v, implicitly promoting them to 3-d
+ux = bx - ax;
+uy = by - ay;
+uz = 0;
+
+vx = cx - bx;
+vy = cy - by;
+vz = 0;
+
+# compute w, the cross product of u and v
+wx = uy*vz - uz*vy;
+wy = uz*vx - ux*vz;
+wz = ux*vy - uy*vx;
+
+# assert wx == 0 && wy == 0, because are contained in the x-y plane, so their
+# cross product should be purely along the z-axis.
+
+# test the sign of w.z:
+# if zero, the points were collinear (their displacements were parallel)
+# if negative, the points a -> b -> c moves clockwise
+# if positive, the points a -> b -> c move counterclockwise.
+print wz;
+if wz < 0 then
+  print -1;
+else
+  if wz > 0 then
+    print 1;
+  else
+    print 0;
+  end
+end
