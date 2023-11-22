@@ -2,6 +2,7 @@
 #[derive(Clone, PartialEq, Eq, Hash)]
 pub struct Var(pub String);
 
+#[derive(Clone)]
 pub enum Expr {
     Var(Var),
     Num(i64),
@@ -9,6 +10,7 @@ pub enum Expr {
     Input(Box<Expr>),
 }
 
+#[derive(Clone, Copy)]
 pub enum BinOp {
     Add,
     Sub,

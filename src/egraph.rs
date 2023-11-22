@@ -288,6 +288,8 @@ impl ExprBuilder {
     }
 }
 
+// TODO: Split a program into a tree of basic blocks, so that I can optimize each block
+// individually.
 fn optimize(prog: &Program) -> Program {
     let mut com = EGraphBuilder::new();
     com.program_to_egraph(&prog);
@@ -389,4 +391,89 @@ pub fn demo() {
     // This is easy for straight-line code
     // This involves inserting phis after an if-stmt somehow
 
+}
+
+
+enum BBStmt {
+    Assign(Var, Box<Expr>),
+    Print(Box<Expr>),
+}
+
+struct IfTree {
+    pre: Box<BBTree>,
+    cond: Box<Expr>,
+    true_block: Box<BBTree>,
+    false_block: Box<BBTree>,
+    post: Box<BBTree>,
+}
+
+impl IfTree {
+    fn push_stmt(&mut self, stmt: BBStmt) {
+        self.post.push_stmt(stmt);
+    }
+}
+
+struct WhileTree {
+    pre: Box<BBTree>,
+    cond: Box<Expr>,
+    body: Box<BBTree>,
+    post: Box<BBTree>,
+}
+
+impl WhileTree {
+    fn push_stmt(&mut self, stmt: BBStmt) {
+        self.post.push_stmt(stmt);
+    }
+}
+
+enum BBTree {
+    Leaf(Vec<BBStmt>),
+    If(IfTree),
+    While(WhileTree),
+}
+
+impl BBTree {
+    fn push_stmt(&mut self, stmt: BBStmt) {
+        match self {
+            BBTree::Leaf(ref mut stmts) => stmts.push(stmt),
+            BBTree::If(ref mut node) => node.push_stmt(stmt),
+            BBTree::While(ref mut node) => node.push_stmt(stmt),
+        }
+    }
+}
+
+fn program_build_bb_tree(prog: &Program) -> BBTree {
+    block_build_bb_tree(&prog.0)
+}
+
+fn block_build_bb_tree(block: &Block) -> BBTree {
+    let mut tree = BBTree::Leaf(vec![]);
+    for s in &block.0 {
+        match s {
+            Stmt::Assign(x, e) => tree.push_stmt(BBStmt::Assign(x.clone(), (*e).clone())),
+            Stmt::Print(e) => tree.push_stmt(BBStmt::Print((*e).clone())),
+            Stmt::If(e, bt, bf) => {
+                let ttree = block_build_bb_tree(bt);
+                let ftree = block_build_bb_tree(bf);
+                tree = BBTree::If(IfTree {
+                    pre: Box::new(tree),
+                    cond: (*e).clone(),
+                    true_block: Box::new(ttree),
+                    false_block: Box::new(ftree),
+                    post: Box::new(BBTree::Leaf(vec![])),
+                });
+            },
+            Stmt::While(e, b) => {
+                let btree = block_build_bb_tree(b);
+                tree = BBTree::While(WhileTree {
+                    pre: Box::new(tree),
+                    cond: (*e).clone(),
+                    body: Box::new(btree),
+                    post: Box::new(BBTree::Leaf(vec![])),
+                });
+            },
+        }
+    }
+
+    tree
 }
