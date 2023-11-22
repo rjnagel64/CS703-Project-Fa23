@@ -1,0 +1,13 @@
+
+input x(0);
+
+y = x + 2;
+z = 2 + x;
+
+print y - z;
+
+a = y * z;
+b = a + 3 * z;
+c = a - b;
+
+print b;
