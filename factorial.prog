@@ -1,5 +1,5 @@
-# Read x from the command line
-input x;
+# Read x from the command line, position 0
+input x(0);
 y = 1;
 
 while x > 0 do

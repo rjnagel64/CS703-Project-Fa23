@@ -92,7 +92,7 @@ struct EGraphBuilder {
 
 impl EGraphBuilder {
     fn new() -> Self {
-        let mut graph = EGraph::new();
+        let mut graph = EGraph::new(());
         let io_root = graph.add(GraphExpr::IOInit);
 
         EGraphBuilder {
@@ -146,7 +146,7 @@ impl EGraphBuilder {
                 },
                 Stmt::Print(e) => {
                     let id = self.expression_to_egraph(e);
-                    self.io_root = self.graph.add(GraphExpr::IOSeq(self.io_root, id));
+                    self.io_root = self.graph.add(GraphExpr::IOSeq([self.io_root, id]));
                 },
                 _ => {
                     unimplemented!("complex statements to egraph")

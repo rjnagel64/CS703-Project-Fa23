@@ -3,12 +3,12 @@
 # example: (3, 4) -> (3, 6) -> (1, 4) is counterclockwise
 # example: (2, 2) -> (4, 3) -> (0, 2) is clockwise
 # example: (1, 1) -> (2, 3) -> (0, -1) are collinear
-input ax;
-input ay;
-input bx;
-input by;
-input cx;
-input cy;
+input ax(0);
+input ay(1);
+input bx(2);
+input by(3);
+input cx(4);
+input cy(5);
 
 # construct displacement vectors u and v, implicitly promoting them to 3-d
 ux = bx - ax;

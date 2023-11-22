@@ -84,7 +84,8 @@ impl Compiler {
                 let slot = self.slots.get(x).unwrap();
                 self.emit(Insn::SetLocal(*slot));
             },
-            Stmt::Input(x) => {
+            Stmt::Input(x, e) => {
+                self.compile_exp(e);
                 let slot = self.slots.get(x).unwrap();
                 self.emit(Insn::Input(*slot));
             },
@@ -168,7 +169,7 @@ impl Compiler {
                     i
                 });
             },
-            Stmt::Input(x) => {
+            Stmt::Input(x, _e) => {
                 let entry = self.slots.entry(x.clone());
                 entry.or_insert_with(|| {
                     let i = self.num_slots;
@@ -259,7 +260,8 @@ impl VM {
                 self.locals[self.fp + x] = self.stack.pop().unwrap();
             },
             Insn::Input(x) => {
-                self.locals[self.fp + x] = self.args.remove(0);
+                let index = self.stack.pop().unwrap();
+                self.locals[self.fp + x] = self.args[index as usize];
             },
             Insn::Branch(n) => return Some(self.pc.wrapping_add_signed(n)),
             Insn::BranchZero(n) => {
