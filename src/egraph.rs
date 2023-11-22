@@ -59,6 +59,7 @@ use egg::{rewrite, define_language};
 
 use crate::syntax::{Block, Stmt, Expr, BinOp, Var, Program};
 use crate::parser::ProgramParser;
+// use crate::
 
 use std::collections::HashMap;
 
@@ -177,6 +178,126 @@ impl EGraphBuilder {
 
 // Cyclic expressions: use EGraph::union(i, j) to equate i and j, creating a cycle?
 
+fn extract_program(exprs: &RecExpr<GraphExpr>) -> Block {
+    let mut stmts = vec![];
+
+    // Aha! It is actually a graph with sharing! The duplicate expression were just a result of
+    // pretty-printing!
+    let expr_slice = exprs.as_ref();
+    println!("{:?}", &expr_slice);
+
+    // Okay, so I want to preserve sharing.
+    // Thus, if there is more than one use of a particular node, I want to save that node in a
+    // variable somehow. (Unless that variable is just a constant, because I can rematerialize that
+    // constant easily)
+
+    let mut num_uses = HashMap::new();
+    let mut count = |x: &Id| {
+        *num_uses.entry(x.clone()).or_insert(0) += 1;
+    };
+    for ge in expr_slice {
+        match ge {
+            GraphExpr::Add([x, y]) => { count(x); count(y); },
+            GraphExpr::Mul([x, y]) => { count(x); count(y); },
+            GraphExpr::Sub([x, y]) => { count(x); count(y); },
+            GraphExpr::Lt([x, y]) => { count(x); count(y); },
+            GraphExpr::Gt([x, y]) => { count(x); count(y); },
+            GraphExpr::ArgRef(x) => { count(x); },
+            GraphExpr::IOSeq([x, y]) => { count(x); count(y); },
+            _ => {}, // Num, Symbol, IOInit
+        }
+    }
+    println!("{:?}", num_uses);
+
+
+    let mut builder = ExprBuilder::new(num_uses);
+
+    // let mut vars: HashMap<Id, Var> = HashMap::new();
+    // for (k, v) in num_uses.iter() {
+    //     if *v > 1 {
+    //         vars.insert(*k, Var(format!("x{}", k)));
+    //     }
+    // }
+    // let mut exps: HashMap<Id, Expr> = HashMap::new();
+    // let mut get_exp = |x: &Id| {
+    //     match vars.get(x) {
+    //         None => exps.remove(x).unwrap(),
+    //         Some(v) => Expr::Var(v.clone()),
+    //     }
+    // };
+    // let mut put_exp = |x: Id, e: Expr| {
+    //     exps.insert(x, e);
+    // };
+    for (i, ge) in expr_slice.iter().enumerate() {
+        let exp = match ge {
+            GraphExpr::Add([x, y]) => {
+                let ex = builder.get_exp(x);
+                let ey = builder.get_exp(y);
+                Expr::BinOp(BinOp::Add, Box::new(ex), Box::new(ey))
+            },
+            GraphExpr::Mul([x, y]) => {
+                let ex = builder.get_exp(x);
+                let ey = builder.get_exp(y);
+                Expr::BinOp(BinOp::Mul, Box::new(ex), Box::new(ey))
+            },
+            GraphExpr::Num(n) => {
+                Expr::Num(*n)
+            },
+            GraphExpr::ArgRef(x) => {
+                // I should have made arg refs actual for real expressions.
+                // Maybe it's similar to how print statements work?
+                unimplemented!("arg ref is actually an assignment statement, ugh.");
+            },
+            _ => unimplemented!("lol"),
+        };
+
+        let id = Id::from(i);
+        builder.add_exp(id, exp);
+        // match builder.vars.get(&id) {
+        //     some(v) => stmts.push(stmt::assign(v.clone(), box::new(exp))),
+        //     none => builder.put_exp(id, exp),
+        // }
+    }
+
+    Block(stmts)
+}
+
+struct ExprBuilder {
+    vars: HashMap<Id, Var>,
+    exps: HashMap<Id, Expr>,
+    stmts: Vec<Stmt>,
+}
+
+impl ExprBuilder {
+    fn new(num_uses: HashMap<Id, usize>) -> Self {
+        let mut vars = HashMap::new();
+        for (k, v) in num_uses.into_iter() {
+            if v > 1 {
+                vars.insert(k, Var(format!("x{}", k)));
+            }
+        }
+        ExprBuilder { vars, exps: HashMap::new(), stmts: Vec::new() }
+    }
+
+    fn get_exp(&mut self, x: &Id) -> Expr {
+        match self.vars.get(x) {
+            None => self.exps.remove(x).unwrap(),
+            Some(v) => Expr::Var(v.clone()),
+        }
+    }
+
+    fn add_exp(&mut self, x: Id, e: Expr) {
+        match self.vars.get(&x) {
+            Some(v) => {
+                self.stmts.push(Stmt::Assign(v.clone(), Box::new(e)))
+            },
+            None => {
+                self.exps.insert(x, e);
+            },
+        }
+    }
+}
+
 fn run_program(src: &str, args: Vec<i64>) {
     let parser = ProgramParser::new();
     let prog = parser.parse(src).expect("valid syntax");
@@ -199,6 +320,9 @@ fn run_program(src: &str, args: Vec<i64>) {
     let (_best_cost, best_expr) = extractor.find_best(program_root);
     println!("{}", best_expr);
 
+    let new_block = extract_program(&best_expr);
+    let new_prog = Program(new_block);
+
     // Okay, now I need some sort of "linearizer" that turns an egraph-expression back into a
     // program.
     //
@@ -206,7 +330,7 @@ fn run_program(src: &str, args: Vec<i64>) {
     // tends to duplicate subexpressions.
 
     // let mut com = Compiler::new();
-    // com.compile_program(&p);
+    // com.compile_program(&new_prog);
     //
     // let code = com.output();
     // println!("--- Compiled bytecode: ---");
