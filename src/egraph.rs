@@ -399,18 +399,20 @@ enum BBStmt {
     Print(Box<Expr>),
 }
 
+struct BB(Vec<BBStmt>);
+
+enum BBTree {
+    Leaf(BB),
+    If(IfTree),
+    While(WhileTree),
+}
+
 struct IfTree {
     pre: Box<BBTree>,
     cond: Box<Expr>,
     true_block: Box<BBTree>,
     false_block: Box<BBTree>,
     post: Box<BBTree>,
-}
-
-impl IfTree {
-    fn push_stmt(&mut self, stmt: BBStmt) {
-        self.post.push_stmt(stmt);
-    }
 }
 
 struct WhileTree {
@@ -420,22 +422,32 @@ struct WhileTree {
     post: Box<BBTree>,
 }
 
+impl BB {
+    fn new() -> Self {
+        BB(vec![])
+    }
+
+    fn push_stmt(&mut self, stmt: BBStmt) {
+        self.0.push(stmt);
+    }
+}
+
+impl IfTree {
+    fn push_stmt(&mut self, stmt: BBStmt) {
+        self.post.push_stmt(stmt);
+    }
+}
+
 impl WhileTree {
     fn push_stmt(&mut self, stmt: BBStmt) {
         self.post.push_stmt(stmt);
     }
 }
 
-enum BBTree {
-    Leaf(Vec<BBStmt>),
-    If(IfTree),
-    While(WhileTree),
-}
-
 impl BBTree {
     fn push_stmt(&mut self, stmt: BBStmt) {
         match self {
-            BBTree::Leaf(ref mut stmts) => stmts.push(stmt),
+            BBTree::Leaf(ref mut bb) => bb.push_stmt(stmt),
             BBTree::If(ref mut node) => node.push_stmt(stmt),
             BBTree::While(ref mut node) => node.push_stmt(stmt),
         }
@@ -447,7 +459,7 @@ fn program_build_bb_tree(prog: &Program) -> BBTree {
 }
 
 fn block_build_bb_tree(block: &Block) -> BBTree {
-    let mut tree = BBTree::Leaf(vec![]);
+    let mut tree = BBTree::Leaf(BB::new());
     for s in &block.0 {
         match s {
             Stmt::Assign(x, e) => tree.push_stmt(BBStmt::Assign(x.clone(), (*e).clone())),
@@ -460,7 +472,7 @@ fn block_build_bb_tree(block: &Block) -> BBTree {
                     cond: (*e).clone(),
                     true_block: Box::new(ttree),
                     false_block: Box::new(ftree),
-                    post: Box::new(BBTree::Leaf(vec![])),
+                    post: Box::new(BBTree::Leaf(BB::new())),
                 });
             },
             Stmt::While(e, b) => {
@@ -469,7 +481,7 @@ fn block_build_bb_tree(block: &Block) -> BBTree {
                     pre: Box::new(tree),
                     cond: (*e).clone(),
                     body: Box::new(btree),
-                    post: Box::new(BBTree::Leaf(vec![])),
+                    post: Box::new(BBTree::Leaf(BB::new())),
                 });
             },
         }
@@ -477,3 +489,31 @@ fn block_build_bb_tree(block: &Block) -> BBTree {
 
     tree
 }
+
+// TODO: Convert BBTree to egraph. whole-program egraph or per-block egraph?
+// TODO: Convert egraph to BBTree. 
+
+// fn optimize_bb(bb: &BB) -> BB {
+//     // Convert BB to egraph
+//     ;
+//
+//     // Run rewrites on egraph
+//     // Extract resulting RecExpr
+//     ;
+//
+//     // Extract resulting BB
+//     // extract_program() actually produces a BB, so I should be able to just tweak that to fit
+//     // here.
+//     ;
+//
+//     // Return resulting BB
+//     ;
+// }
+//
+// fn optimize_bb_tree(tree: &BBTree) -> BBTree {
+//     // recursively optimize each leaf BB in the tree
+//     // Hmm. How do I optimize the condition expressions?
+//     // Also, I need to remember to ensure that variables live at exit of a BB remain live in the
+//     // optimized program. I think I can achieve both of these at once with a notion of "roots"?
+//     ;
+// }
