@@ -287,10 +287,7 @@ impl ExprBuilder {
     }
 }
 
-fn run_program(src: &str, args: Vec<i64>) {
-    let parser = ProgramParser::new();
-    let prog = parser.parse(src).expect("valid syntax");
-
+fn optimize(prog: &Program) -> Program {
     let mut com = EGraphBuilder::new();
     com.program_to_egraph(&prog);
 
@@ -312,14 +309,12 @@ fn run_program(src: &str, args: Vec<i64>) {
     let new_block = extract_program(&best_expr);
     let new_prog = Program(new_block);
 
-    // Okay, now I need some sort of "linearizer" that turns an egraph-expression back into a
-    // program.
-    //
-    // Also, it would be good to have some form of CSE/hash-consing. It seems that the extractor
-    // tends to duplicate subexpressions.
+    new_prog
+}
 
+fn execute(prog: &Program, args: Vec<i64>) {
     let mut com = Compiler::new();
-    com.compile_program(&new_prog);
+    com.compile_program(&prog);
 
     let code = com.output();
     println!("--- Compiled bytecode: ---");
@@ -330,6 +325,16 @@ fn run_program(src: &str, args: Vec<i64>) {
     println!("--- Results: ---");
     vm.execute();
     vm.dump_state();
+}
+
+fn run_program(src: &str, args: Vec<i64>) {
+    let parser = ProgramParser::new();
+
+    let prog = parser.parse(src).expect("valid syntax");
+    execute(&prog, args.clone());
+
+    let new_prog = optimize(&prog);
+    execute(&new_prog, args.clone());
 }
 
 pub fn demo() {
