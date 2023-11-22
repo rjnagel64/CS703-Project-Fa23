@@ -47,7 +47,6 @@
 //   while-loops make this way to complicated, because definitions are hard to make unique without
 //   phi-nodes.
 
-use egg::SymbolLang;
 use egg::RecExpr;
 use egg::EGraph;
 use egg::Rewrite;
@@ -181,7 +180,7 @@ fn extract_program(exprs: &RecExpr<GraphExpr>) -> Block {
     // Aha! It is actually a graph with sharing! The duplicate expressions were just a result of
     // pretty-printing!
     let expr_slice = exprs.as_ref();
-    println!("{:?}", &expr_slice);
+    // println!("{:?}", &expr_slice);
 
     // Okay, so I want to preserve sharing.
     // Thus, if there is more than one use of a particular node, I want to save that node in a
@@ -204,7 +203,7 @@ fn extract_program(exprs: &RecExpr<GraphExpr>) -> Block {
             _ => {}, // Num, Symbol, IOInit
         }
     }
-    println!("{:?}", num_uses);
+    // println!("{:?}", num_uses);
 
 
     let mut builder = ExprBuilder::new(num_uses);
@@ -232,7 +231,7 @@ fn extract_program(exprs: &RecExpr<GraphExpr>) -> Block {
                              // consumed by IOSeq
             },
             GraphExpr::IOSeq([x, y]) => {
-                let ex = builder.get_exp(x);
+                let _ex = builder.get_exp(x); // this value is a dummy 0. discard it.
                 let ey = builder.get_exp(y);
                 builder.print(ey);
                 Expr::Num(0) // just a dummy value
@@ -248,6 +247,8 @@ fn extract_program(exprs: &RecExpr<GraphExpr>) -> Block {
 }
 
 struct ExprBuilder {
+    // TODO: Avoid assigning constants to local variables. They can just be duplicated at their use
+    // sites, because a constant/literal in the program is cheaper than a locals slot+retrieval.
     vars: HashMap<Id, Var>,
     exps: HashMap<Id, Expr>,
     stmts: Vec<Stmt>,
@@ -304,7 +305,7 @@ fn optimize(prog: &Program) -> Program {
     let runner = Runner::default().with_egraph(com.graph).run(rules);
     let extractor = Extractor::new(&runner.egraph, egg::AstSize);
     let (_best_cost, best_expr) = extractor.find_best(program_root);
-    println!("{}", best_expr);
+    // println!("{}", best_expr);
 
     let new_block = extract_program(&best_expr);
     let new_prog = Program(new_block);
@@ -330,15 +331,18 @@ fn execute(prog: &Program, args: Vec<i64>) {
 fn run_program(src: &str, args: Vec<i64>) {
     let parser = ProgramParser::new();
 
+    println!("Original program:");
     let prog = parser.parse(src).expect("valid syntax");
     execute(&prog, args.clone());
 
+    println!("");
+    println!("Optimized program:");
     let new_prog = optimize(&prog);
     execute(&new_prog, args.clone());
 }
 
 pub fn demo() {
-    println!("EGG");
+    // println!("EGG");
 
     let src_filename = "demo.prog";
     let src = std::fs::read_to_string(src_filename).expect("src file does not exist");

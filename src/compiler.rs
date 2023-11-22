@@ -18,8 +18,7 @@ pub enum Insn {
     Exit(usize),
     GetLocal(usize),
     SetLocal(usize),
-    Input(usize),
-    Input2,
+    Input,
     Branch(isize),
     BranchZero(isize),
 }
@@ -71,7 +70,7 @@ impl Compiler {
             },
             Expr::Input(e) => {
                 self.compile_exp(e);
-                self.emit(Insn::Input2);
+                self.emit(Insn::Input);
             }
         }
     }
@@ -246,11 +245,7 @@ impl VM {
             Insn::SetLocal(x) => {
                 self.locals[self.fp + x] = self.stack.pop().unwrap();
             },
-            Insn::Input(x) => {
-                let index = self.stack.pop().unwrap();
-                self.locals[self.fp + x] = self.args[index as usize];
-            },
-            Insn::Input2 => {
+            Insn::Input => {
                 let index = self.stack.pop().unwrap();
                 self.stack.push(self.args[index as usize]);
             },

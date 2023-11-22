@@ -1,5 +1,4 @@
 
-use std::collections::HashMap;
 use lalrpop_util::lalrpop_mod;
 
 lalrpop_mod!(parser);
@@ -8,7 +7,6 @@ mod syntax;
 mod egraph;
 
 use parser::ProgramParser;
-use syntax::{Var, Expr, BinOp, Stmt, Block, Program};
 
 use compiler::{Compiler, VM};
 
