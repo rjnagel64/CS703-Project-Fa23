@@ -59,7 +59,7 @@ use egg::{rewrite, define_language};
 
 use crate::syntax::{Block, Stmt, Expr, BinOp, Var, Program};
 use crate::parser::ProgramParser;
-// use crate::
+use crate::compiler::{Compiler, VM};
 
 use std::collections::HashMap;
 
@@ -178,9 +178,7 @@ impl EGraphBuilder {
 // Cyclic expressions: use EGraph::union(i, j) to equate i and j, creating a cycle?
 
 fn extract_program(exprs: &RecExpr<GraphExpr>) -> Block {
-    let mut stmts = vec![];
-
-    // Aha! It is actually a graph with sharing! The duplicate expression were just a result of
+    // Aha! It is actually a graph with sharing! The duplicate expressions were just a result of
     // pretty-printing!
     let expr_slice = exprs.as_ref();
     println!("{:?}", &expr_slice);
@@ -210,23 +208,6 @@ fn extract_program(exprs: &RecExpr<GraphExpr>) -> Block {
 
 
     let mut builder = ExprBuilder::new(num_uses);
-
-    // let mut vars: HashMap<Id, Var> = HashMap::new();
-    // for (k, v) in num_uses.iter() {
-    //     if *v > 1 {
-    //         vars.insert(*k, Var(format!("x{}", k)));
-    //     }
-    // }
-    // let mut exps: HashMap<Id, Expr> = HashMap::new();
-    // let mut get_exp = |x: &Id| {
-    //     match vars.get(x) {
-    //         None => exps.remove(x).unwrap(),
-    //         Some(v) => Expr::Var(v.clone()),
-    //     }
-    // };
-    // let mut put_exp = |x: Id, e: Expr| {
-    //     exps.insert(x, e);
-    // };
     for (i, ge) in expr_slice.iter().enumerate() {
         let exp = match ge {
             GraphExpr::Add([x, y]) => {
@@ -261,13 +242,9 @@ fn extract_program(exprs: &RecExpr<GraphExpr>) -> Block {
 
         let id = Id::from(i);
         builder.add_exp(id, exp);
-        // match builder.vars.get(&id) {
-        //     some(v) => stmts.push(stmt::assign(v.clone(), box::new(exp))),
-        //     none => builder.put_exp(id, exp),
-        // }
     }
 
-    Block(stmts)
+    Block(builder.stmts)
 }
 
 struct ExprBuilder {
@@ -341,18 +318,18 @@ fn run_program(src: &str, args: Vec<i64>) {
     // Also, it would be good to have some form of CSE/hash-consing. It seems that the extractor
     // tends to duplicate subexpressions.
 
-    // let mut com = Compiler::new();
-    // com.compile_program(&new_prog);
-    //
-    // let code = com.output();
-    // println!("--- Compiled bytecode: ---");
-    // println!("{:?}", code);
-    //
-    // let mut vm = VM::new(code, args);
-    //
-    // println!("--- Results: ---");
-    // vm.execute();
-    // vm.dump_state();
+    let mut com = Compiler::new();
+    com.compile_program(&new_prog);
+
+    let code = com.output();
+    println!("--- Compiled bytecode: ---");
+    println!("{:?}", code);
+
+    let mut vm = VM::new(code, args);
+
+    println!("--- Results: ---");
+    vm.execute();
+    vm.dump_state();
 }
 
 pub fn demo() {
