@@ -6,6 +6,7 @@ pub enum Expr {
     Var(Var),
     Num(i64),
     BinOp(BinOp, Box<Expr>, Box<Expr>),
+    Input(Box<Expr>),
 }
 
 pub enum BinOp {
@@ -21,30 +22,7 @@ pub enum Stmt {
     If(Box<Expr>, Block, Block),
     While(Box<Expr>, Block),
     Print(Box<Expr>),
-    Input(Var, Box<Expr>),
 }
-
-// TODO: Replace 'input x;' statement with 'x = args(0);' expression.
-// This lets me avoid mutating global state when reading input, so e-graph conversion should be
-// simpler.
-//
-// The primary downside of this is that I can now only consume a fixed number of arguments, i.e., I
-// can no longer do something like this:
-//
-// ```
-// # Read `n` values from the command line and compute their sum.
-// input n;
-// acc = 0;
-// while n > 0 do
-//   input x;
-//   acc = acc + x;
-//   n = n - 1;
-// end;
-// print acc;
-// ```
-//
-// However, this isn't really the kind of program I intended to write in the first place, so I
-// don't really feel bad about forbidding it.
 
 pub struct Block(pub Vec<Stmt>);
 

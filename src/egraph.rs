@@ -134,6 +134,10 @@ impl EGraphBuilder {
                     BinOp::Gt => self.graph.add(GraphExpr::Gt([i1, i2])),
                 }
             },
+            Expr::Input(e) => {
+                let i = self.expression_to_egraph(e);
+                self.graph.add(GraphExpr::ArgRef(i))
+            },
         }
     }
 
@@ -157,11 +161,6 @@ impl EGraphBuilder {
                 Stmt::Print(e) => {
                     let id = self.expression_to_egraph(e);
                     self.io_root = self.graph.add(GraphExpr::IOSeq([self.io_root, id]));
-                },
-                Stmt::Input(x, e) => {
-                    let arg_id = self.expression_to_egraph(e);
-                    let exp_id = self.graph.add(GraphExpr::ArgRef(arg_id));
-                    self.env.insert(x.clone(), exp_id);
                 },
                 _ => {
                     unimplemented!("complex statements to egraph")
@@ -244,9 +243,18 @@ fn extract_program(exprs: &RecExpr<GraphExpr>) -> Block {
                 Expr::Num(*n)
             },
             GraphExpr::ArgRef(x) => {
-                // I should have made arg refs actual for real expressions.
-                // Maybe it's similar to how print statements work?
-                unimplemented!("arg ref is actually an assignment statement, ugh.");
+                let ex = builder.get_exp(x);
+                Expr::Input(Box::new(ex))
+            },
+            GraphExpr::IOInit => {
+                Expr::Num(0) // just a dummy value. not actually used for anything other than being
+                             // consumed by IOSeq
+            },
+            GraphExpr::IOSeq([x, y]) => {
+                let ex = builder.get_exp(x);
+                let ey = builder.get_exp(y);
+                builder.print(ey);
+                Expr::Num(0) // just a dummy value
             },
             _ => unimplemented!("lol"),
         };
@@ -295,6 +303,10 @@ impl ExprBuilder {
                 self.exps.insert(x, e);
             },
         }
+    }
+
+    fn print(&mut self, e: Expr) {
+        self.stmts.push(Stmt::Print(Box::new(e)));
     }
 }
 

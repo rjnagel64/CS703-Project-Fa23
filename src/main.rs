@@ -25,6 +25,7 @@ enum Insn {
     GetLocal(usize),
     SetLocal(usize),
     Input(usize),
+    Input2,
     Branch(isize),
     BranchZero(isize),
 }
@@ -74,6 +75,10 @@ impl Compiler {
                     BinOp::Gt => self.emit(Insn::Gt),
                 }
             },
+            Expr::Input(e) => {
+                self.compile_exp(e);
+                self.emit(Insn::Input2);
+            }
         }
     }
 
@@ -83,11 +88,6 @@ impl Compiler {
                 self.compile_exp(e);
                 let slot = self.slots.get(x).unwrap();
                 self.emit(Insn::SetLocal(*slot));
-            },
-            Stmt::Input(x, e) => {
-                self.compile_exp(e);
-                let slot = self.slots.get(x).unwrap();
-                self.emit(Insn::Input(*slot));
             },
             Stmt::Print(e) => {
                 self.compile_exp(e);
@@ -163,14 +163,6 @@ impl Compiler {
                 let entry = self.slots.entry(x.clone());
                 // If this variable already has a slot, nothing needs to be done.
                 // Otherwise, we need to assign a new slot.
-                entry.or_insert_with(|| {
-                    let i = self.num_slots;
-                    self.num_slots += 1;
-                    i
-                });
-            },
-            Stmt::Input(x, _e) => {
-                let entry = self.slots.entry(x.clone());
                 entry.or_insert_with(|| {
                     let i = self.num_slots;
                     self.num_slots += 1;
@@ -262,6 +254,10 @@ impl VM {
             Insn::Input(x) => {
                 let index = self.stack.pop().unwrap();
                 self.locals[self.fp + x] = self.args[index as usize];
+            },
+            Insn::Input2 => {
+                let index = self.stack.pop().unwrap();
+                self.stack.push(self.args[index as usize]);
             },
             Insn::Branch(n) => return Some(self.pc.wrapping_add_signed(n)),
             Insn::BranchZero(n) => {

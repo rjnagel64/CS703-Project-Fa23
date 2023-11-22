@@ -41,6 +41,7 @@ AtomExpr: Expr = {
     Var => Expr::Var(<>),
     Literal => Expr::Num(<>),
     "(" <Expr> ")" => <>,
+    "input" "(" <e: Expr> ")" => Expr::Input(Box::new(e)),
 };
 
 MulExpr: Expr = {
@@ -63,7 +64,6 @@ CmpExpr: Expr = {
 Stmt: Stmt = {
     <x: Var> "=" <e: Expr> ";" => Stmt::Assign(x, Box::new(e)),
     "print" <e: Expr> ";" => Stmt::Print(Box::new(e)),
-    "input" <x: Var> "(" <e: Expr> ")" ";" => Stmt::Input(x, Box::new(e)),
     "if" <e: Expr> "then" <bt: Block> "else" <bf: Block> "end" => Stmt::If(Box::new(e), bt, bf),
     "while" <e: Expr> "do" <b: Block> "end" => Stmt::While(Box::new(e), b),
 }
